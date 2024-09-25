@@ -93,7 +93,6 @@ function deploy_contract() {
     # 设置 Bun 项目
     mkdir -p infinit && cd infinit || exit
     bun init -y
-    bun add @infinit-xyz/cli
 
     echo "正在初始化 Infinit CLI 并生成帐户..."
     bunx infinit init
