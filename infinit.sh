@@ -50,6 +50,25 @@ function check_install() {
     fi
 }
 
+# 让用户选择 RPC URL
+function select_rpc() {
+    echo "请选择 RPC URL（使用方向键选择并按 Enter 确认）:"
+    PS3="请选择一个选项: "
+    options=("https://1rpc.io/holesky" "https://endpoints.omniatech.io/v1/eth/holesky/public" "https://ethereum-holesky-rpc.publicnode.com")
+    
+    select opt in "${options[@]}"; do
+        case $opt in
+            "${options[0]}"|"${options[1]}"|"${options[2]}")
+                echo "您选择的 RPC URL: $opt"
+                # 替换到配置文件
+                sed -i "s|rpc_url: .*|rpc_url: '$opt'|" /root/infinit/src/infinit.config.yaml
+                break
+                ;;
+            *) echo "无效选择，请重试." ;;
+        esac
+    done
+}
+
 # 部署合约
 function deploy_contract() {
     export NVM_DIR="$HOME/.nvm"
@@ -68,8 +87,7 @@ function deploy_contract() {
         nvm use default
     fi
     
-    show "安装 Foundry..."
-    echo
+    echo "安装 Foundry..."
     curl -L https://foundry.paradigm.xyz | bash
     export PATH="$HOME/.foundry/bin:$PATH"
     sleep 5
@@ -79,9 +97,9 @@ function deploy_contract() {
     # 检查并安装 Bun
     if ! command -v bun &> /dev/null; then
         curl -fsSL https://bun.sh/install | bash
-        export PATH="$HOME/.bun/bin:$PATH"  # 更新 PATH
+        export PATH="$HOME/.bun/bin:$PATH"
         sleep 5
-        source "$HOME/.bashrc"  # 确保环境变量生效
+        source "$HOME/.bashrc"
     fi
 
     # 检查 Bun 是否存在
@@ -104,16 +122,15 @@ function deploy_contract() {
     read -p "您的帐户 ID 是什么（在上面的步骤中输入） : " ACCOUNT_ID
     echo
 
-    show "复制这个私钥并保存在某个地方，这是这个钱包的私钥"
-    echo
+    echo "复制这个私钥并保存在某个地方，这是这个钱包的私钥"
     bunx infinit account export $ACCOUNT_ID
 
     sleep 5
     echo
-    # Removing old deployUniswapV3Action script if exists
+
+    # 移除旧的 deployUniswapV3Action 脚本如果存在
     rm -rf src/scripts/deployUniswapV3Action.script.ts
 
-    
 cat <<EOF > src/scripts/deployUniswapV3Action.script.ts
 import { DeployUniswapV3Action, type actions } from '@infinit-xyz/uniswap-v3/actions'
 import type { z } from 'zod'
@@ -122,16 +139,9 @@ type Param = z.infer<typeof actions['init']['paramsSchema']>
 
 // TODO: Replace with actual params
 const params: Param = {
-  // Native currency label (e.g., ETH)
   "nativeCurrencyLabel": 'ETH',
-
-  // Address of the owner of the proxy admin
   "proxyAdminOwner": '$WALLET',
-
-  // Address of the owner of factory
   "factoryOwner": '$WALLET',
-
-  // Address of the wrapped native token (e.g., WETH)
   "wrappedNativeToken": '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 }
 
@@ -142,6 +152,9 @@ const signer = {
 
 export default { params, signer, Action: DeployUniswapV3Action }
 EOF
+
+    # 让用户选择 RPC
+    select_rpc
 
     echo "正在执行 UniswapV3 Action 脚本..."
     bunx infinit script execute deployUniswapV3Action.script.ts
